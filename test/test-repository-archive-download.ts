@@ -39,6 +39,7 @@ describe('Repository archive download', { timeout: 60_000 }, () => {
   let sessionId: string;
   let repositoryArchiveQuery: Record<string, unknown> = {};
   let repositoryArchiveAccept: string | undefined;
+  let repositoryArchiveFetchMode: string | undefined;
 
   before(async () => {
     const mockPort = await findMockServerPort();
@@ -52,7 +53,8 @@ describe('Repository archive download', { timeout: 60_000 }, () => {
       (req, res) => {
         repositoryArchiveQuery = req.query as Record<string, unknown>;
         repositoryArchiveAccept = req.headers.accept;
-        if (repositoryArchiveAccept !== '*/*') {
+        repositoryArchiveFetchMode = req.headers['sec-fetch-mode'];
+        if (repositoryArchiveAccept !== '*/*' || repositoryArchiveFetchMode !== 'same-origin') {
           res.status(406).json({ message: '406 Not Acceptable' });
           return;
         }
@@ -110,6 +112,7 @@ describe('Repository archive download', { timeout: 60_000 }, () => {
   test('returns the tar.gz directly as an embedded MCP resource', async () => {
     repositoryArchiveQuery = {};
     repositoryArchiveAccept = undefined;
+    repositoryArchiveFetchMode = undefined;
     const toolRes = await fetch(`http://${HOST}:${serverPort}/mcp`, {
       method: 'POST',
       headers: {
@@ -163,6 +166,7 @@ describe('Repository archive download', { timeout: 60_000 }, () => {
     assert.ok(!('download_url' in metadata), 'Remote result must not require a secondary URL fetch');
 
     assert.strictEqual(repositoryArchiveAccept, '*/*');
+    assert.strictEqual(repositoryArchiveFetchMode, 'same-origin');
     assert.strictEqual(repositoryArchiveQuery.sha, 'main');
     assert.strictEqual(repositoryArchiveQuery.path, 'src');
     assert.strictEqual(repositoryArchiveQuery.exclude_paths, 'dist,tmp');

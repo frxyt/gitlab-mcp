@@ -13215,6 +13215,10 @@ async function handleToolCall(params: any) {
         archiveHeaders.set("Accept", "*/*");
         const response = await fetch(archiveUrl.toString(), {
           ...archiveFetchConfig,
+          // GitLab's archive endpoint is protected by its hotlink checks on some
+          // self-hosted installations. Node fetch defaults to `cors`, which sends
+          // `Sec-Fetch-Mode: cors` and can trigger HTTP 406. Keep this same-origin.
+          mode: "same-origin",
           headers: archiveHeaders,
         });
         if (response.status === 404) {
