@@ -67,7 +67,7 @@ Project/namespace listing, member queries, group iterations, and server health. 
 
 ### [Projects & Files](repositories.md)
 
-Project search/creation/fork plus the Files API for reading and writing repository content without shelling out to git. *(7 tools)*
+Project search/creation/fork plus the Files API for reading and writing repository content without shelling out to git. *(8 tools)*
 
 | Tool | What it does | R/W |
 |---|---|:-:|
@@ -78,6 +78,7 @@ Project search/creation/fork plus the Files API for reading and writing reposito
 | [`create_or_update_file`](repositories.md#create_or_update_file) | Create or update a file in a GitLab project. Use this for a single repository file when you know whether the target path is new or already exists; use `push_files` for a multi-file commit. Optional `encoding` (`text` or `base64`) defaults to `GITLAB_REPO_FILE_ENCODING` so existing callers stay unchanged. The operation creates or updates remote content in a commit, requires repository write permission, and returns the commit result or a conflict/validation error. | ✏️ |
 | [`fork_repository`](repositories.md#fork_repository) | Fork a project to your account or specified namespace. Use this to create a copy of an existing project in the current user's namespace or a permitted namespace; use `search_repositories` or `get_project` to inspect projects without copying them. The operation creates a new project, requires fork permission, and returns the forked project or a namespace/permission error. | ✏️ |
 | [`get_repository_tree`](repositories.md#get_repository_tree) | List files and directories in a repository. Use this for a known resource or result; choose the corresponding list or search tool when you need to discover multiple resources. It is read-only and does not mutate GitLab data; missing resources, invalid identifiers, insufficient permission, and rate limits are returned as errors. When `project_id` or `group_id` is accepted, provide the numeric ID or complete URL-encoded path described by the schema; use required identifiers and pagination fields exactly as documented. | 📖 |
+| [`download_repository_archive`](repositories.md#download_repository_archive) | Download a repository archive and save it to a local path. Use this to retrieve a repository snapshot without cloning; remote HTTP mode returns the archive bytes directly as an embedded MCP binary resource while local mode saves the archive to a local path. It is read-only with respect to GitLab but may create a local file in stdio mode, requires repository access, and returns the archive or a repository/ref/permission error. | 📖 |
 
 ### [Branches & Commits](branches.md)
 

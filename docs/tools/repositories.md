@@ -11,6 +11,7 @@ Project search/creation/fork plus the Files API for reading and writing reposito
 - [`create_or_update_file`](#create_or_update_file) — ✏️ Writes
 - [`fork_repository`](#fork_repository) — ✏️ Writes
 - [`get_repository_tree`](#get_repository_tree) — 📖 Read-only
+- [`download_repository_archive`](#download_repository_archive) — 📖 Read-only
 
 ---
 
@@ -125,3 +126,22 @@ List files and directories in a repository. Use this for a known resource or res
 | `per_page` | number |  | Number of results to show per page |
 | `page_token` | string |  | Token for keyset pagination. Use the next_page_token value returned in the previous response to retrieve the next page. |
 | `pagination` | string |  | Pagination method. Use 'keyset' for keyset-based pagination (required for repositories with many files). Non-keyset calls keep the legacy array response for backward compatibility; that legacy response shape is deprecated and may be removed in a future major release. Keyset calls return a structured response with items and next_page_token when more pages are available. |
+
+### `download_repository_archive`
+
+*📖 Read-only*
+
+Download a repository archive and save it to a local path. Use this to retrieve a repository snapshot without cloning; remote HTTP mode returns the archive bytes directly as an embedded MCP binary resource while local mode saves the archive to a local path. It is read-only with respect to GitLab but may create a local file in stdio mode, requires repository access, and returns the archive or a repository/ref/permission error.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+|---|---|:-:|---|
+| `project_id` | string | ✓ | Project ID or URL-encoded path |
+| `format` | enum (`bz2` \| `tar` \| `tar.bz2` \| `tar.gz` \| `tb2` \| `tbz` \| `tbz2` \| `zip`) |  | Archive format (defaults to tar.gz) |
+| `sha` | string |  | Commit SHA, branch, or tag to download (defaults to the default branch) |
+| `path` | string |  | Subpath of the repository to download |
+| `exclude_paths` | string |  | Comma-separated list of repository paths to exclude from the archive |
+| `include_lfs_blobs` | boolean |  | Whether to include Git LFS objects in the archive (GitLab defaults to true) |
+| `ref_type` | string |  | Type of ref in sha; use when a branch and tag share the same name |
+| `local_path` | string |  | Local directory to save the repository archive (defaults to current directory) |
