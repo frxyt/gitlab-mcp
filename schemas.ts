@@ -4491,6 +4491,46 @@ export const DownloadJobArtifactsRemoteSchema = z.object({
   job_id: z.coerce.string().describe("The ID of the job"),
 });
 
+export const RepositoryArchiveFormatSchema = z.enum([
+  "bz2",
+  "tar",
+  "tar.bz2",
+  "tar.gz",
+  "tb2",
+  "tbz",
+  "tbz2",
+  "zip",
+]);
+export const DownloadRepositoryArchiveSchema = z.object({
+  project_id: z.coerce.string().describe("Project ID or URL-encoded path"),
+  format: RepositoryArchiveFormatSchema.default("tar.gz").describe(
+    "Archive format (defaults to tar.gz)"
+  ),
+  sha: z
+    .string()
+    .optional()
+    .describe("Commit SHA, branch, or tag to download (defaults to the default branch)"),
+  path: z.string().optional().describe("Subpath of the repository to download"),
+  exclude_paths: z
+    .string()
+    .optional()
+    .describe("Comma-separated list of repository paths to exclude from the archive"),
+  include_lfs_blobs: coerceBooleanString
+    .optional()
+    .describe("Whether to include Git LFS objects in the archive (GitLab defaults to true)"),
+  ref_type: z
+    .string()
+    .optional()
+    .describe("Type of ref in sha; use when a branch and tag share the same name"),
+  local_path: z
+    .string()
+    .optional()
+    .describe("Local directory to save the repository archive (defaults to current directory)"),
+});
+export const DownloadRepositoryArchiveRemoteSchema = DownloadRepositoryArchiveSchema.omit({
+  local_path: true,
+});
+
 export const GetJobArtifactFileSchema = z.object({
   project_id: z.coerce.string().describe("Project ID or URL-encoded path"),
   job_id: z.coerce.string().describe("The ID of the job"),

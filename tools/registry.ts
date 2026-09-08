@@ -86,6 +86,8 @@ import {
   DownloadAttachmentRemoteSchema,
   DownloadJobArtifactsSchema,
   DownloadJobArtifactsRemoteSchema,
+  DownloadRepositoryArchiveSchema,
+  DownloadRepositoryArchiveRemoteSchema,
   DownloadReleaseAssetSchema,
   EditProjectMilestoneSchema,
   EditGroupMilestoneSchema,
@@ -813,6 +815,15 @@ export const allTools = [
     name: "get_repository_tree",
     description: "List files and directories in a repository",
     inputSchema: toJSONSchema(GetRepositoryTreeSchema),
+  },
+  {
+    name: "download_repository_archive",
+    description: IS_REMOTE
+      ? "Get a download URL for a repository archive"
+      : "Download a repository archive and save it to a local path",
+    inputSchema: IS_REMOTE
+      ? toJSONSchema(DownloadRepositoryArchiveRemoteSchema)
+      : toJSONSchema(DownloadRepositoryArchiveSchema),
   },
   {
     name: "list_pipelines",
@@ -1615,6 +1626,7 @@ export const readOnlyTools = new Set([
   "get_label",
   "list_group_projects",
   "get_repository_tree",
+  "download_repository_archive",
   "list_milestones",
   "get_milestone",
   "get_milestone_issue",
@@ -1977,6 +1989,7 @@ export const TOOLSET_DEFINITIONS: readonly ToolsetDefinition[] = [
       "create_or_update_file",
       "fork_repository",
       "get_repository_tree",
+      "download_repository_archive",
     ]),
   },
   {

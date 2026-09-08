@@ -530,6 +530,7 @@ import {
   MarkdownUploadRemoteSchema,
   DownloadAttachmentSchema,
   DownloadJobArtifactsSchema,
+  DownloadRepositoryArchiveSchema,
   GetJobArtifactFileSchema,
   type GitLabArtifactEntry,
   GitLabArtifactEntrySchema,
@@ -13177,6 +13178,68 @@ async function handleToolCall(params: any) {
         };
       }
 
+      case "download_repository_archive": {
+        const { project_id, format, local_path, ...options } =
+          DownloadRepositoryArchiveSchema.parse(params.arguments);
+        if (IS_REMOTE) {
+          if (local_path) {
+            throw new Error(
+              "local_path cannot be used in remote mode — use the returned download_url instead"
+            );
+          }
+          const downloadParams: Record<string, string> = { project_id, format };
+          Object.entries(options).forEach(([key, value]) => {
+            if (value !== undefined) downloadParams[key] = String(value);
+          });
+          const downloadUrl = buildDownloadUrl("repository-archive", downloadParams);
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  download_url: downloadUrl,
+                  filename: `repository_archive.${format}`,
+                }),
+              },
+            ],
+          };
+        }
+
+        const effectiveProjectId = getEffectiveProjectId(decodeURIComponent(project_id));
+        const archiveUrl = new URL(
+          `${getEffectiveApiUrl()}/projects/${encodeURIComponent(effectiveProjectId)}/repository/archive.${format}`
+        );
+        Object.entries(options).forEach(([key, value]) => {
+          if (value !== undefined) {
+            archiveUrl.searchParams.set(key, typeof value === "boolean" ? String(value) : value);
+          }
+        });
+        const response = await fetch(archiveUrl.toString(), {
+          ...getFetchConfig(),
+        });
+        if (response.status === 404) {
+          throw new Error("Repository archive not found. Check the project, ref, and path.");
+        }
+        await handleGitLabError(response);
+        if (!response.body) {
+          throw new Error("No response body from GitLab");
+        }
+        const filename = `repository_archive.${format}`;
+        const { stream: saveStream, path: savePath } = openSafeOutputWriteStream(
+          filename,
+          local_path,
+          "local_path"
+        );
+        await streamPipeline(response.body, saveStream);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ success: true, file_path: savePath }),
+            },
+          ],
+        };
+      }
       case "download_job_artifacts": {
         const { project_id, job_id, local_path } = DownloadJobArtifactsSchema.parse(
           params.arguments
