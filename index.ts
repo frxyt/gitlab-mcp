@@ -8617,10 +8617,24 @@ async function getRepositoryTree(
 
   const data = await response.json();
   const items = z.array(GitLabTreeItemSchema).parse(data);
-  const next_page_token =
-    response.headers.get("x-next-page-token") ||
-    (options.pagination === "keyset" ? response.headers.get("x-next-page") : null) ||
-    undefined;
+
+  let linkPageToken: string | undefined;
+  if (options.pagination === "keyset") {
+    const nextLink = response.headers
+      .get("link")
+      ?.split(",")
+      .find(link => /rel="?next"?/i.test(link));
+    const nextUrl = nextLink?.match(/<([^>]+)>/)?.[1];
+    if (nextUrl) {
+      try {
+        linkPageToken = new URL(nextUrl).searchParams.get("page_token") || undefined;
+      } catch {
+        // Ignore malformed Link headers and fall back to the dedicated token header.
+      }
+    }
+  }
+
+  const next_page_token = response.headers.get("x-next-page-token") || linkPageToken || undefined;
   return { items, next_page_token };
 }
 
@@ -11720,7 +11734,7 @@ async function handleToolCall(params: any) {
           statistics?: boolean;
           with_custom_attributes?: boolean;
         };
-        const effectiveProjectId = getEffectiveProjectId(args.project_id);
+        const effectiveProjectId = getEffectiveProjectId(decodeURIComponent(args.project_id));
         const url = new URL(
           `${getEffectiveApiUrl()}/projects/${encodeURIComponent(effectiveProjectId)}`
         );
