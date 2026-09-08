@@ -3,16 +3,25 @@
  */
 import { describe, test, before, after } from 'node:test';
 import assert from 'node:assert';
+import { gzipSync, gunzipSync } from 'node:zlib';
 import { launchServer, TransportMode, ServerInstance, HOST } from './utils/server-launcher.js';
 import { MockGitLabServer, findMockServerPort } from './utils/mock-gitlab-server.js';
 
 const MOCK_TOKEN = 'glpat-repository-archive-test-token';
 const TEST_PROJECT_ID = '123';
-const FAKE_ZIP = Buffer.from('PK\x03\x04fake-repository-archive');
+const ARCHIVE_PAYLOAD = Buffer.from('complete repository snapshot');
+const FAKE_GZIP = gzipSync(ARCHIVE_PAYLOAD);
+
+type ToolContent =
+  | { type: 'text'; text?: string }
+  | {
+      type: 'resource';
+      resource?: { uri: string; mimeType?: string; blob?: string };
+    };
 
 interface JsonRpcResult {
   id?: number;
-  result?: { content?: Array<{ type: string; text?: string }> };
+  result?: { content?: ToolContent[] };
   error?: { code: number; message: string };
 }
 
@@ -38,12 +47,14 @@ describe('Repository archive download', { timeout: 60_000 }, () => {
     });
     mockGitLab.addMockHandler(
       'get',
-      `/projects/${TEST_PROJECT_ID}/repository/archive.zip`,
+      `/projects/${TEST_PROJECT_ID}/repository/archive.tar.gz`,
       (req, res) => {
         repositoryArchiveQuery = req.query as Record<string, unknown>;
-        res.set('Content-Type', 'application/zip');
-        res.set('Content-Disposition', 'attachment; filename="repository-main.zip"');
-        res.send(FAKE_ZIP);
+        // GitLab may use a generic content type for downloads; the MCP tool must
+        // still expose the archive with the MIME type implied by the requested format.
+        res.set('Content-Type', 'application/octet-stream');
+        res.set('Content-Disposition', 'attachment; filename="repository-main.tar.gz"');
+        res.send(FAKE_GZIP);
       }
     );
     await mockGitLab.start();
@@ -90,7 +101,7 @@ describe('Repository archive download', { timeout: 60_000 }, () => {
     if (mockGitLab) await mockGitLab.stop();
   });
 
-  test('returns a signed URL and forwards repository archive options', async () => {
+  test('returns the tar.gz directly as an embedded MCP resource', async () => {
     repositoryArchiveQuery = {};
     const toolRes = await fetch(`http://${HOST}:${serverPort}/mcp`, {
       method: 'POST',
@@ -108,7 +119,7 @@ describe('Repository archive download', { timeout: 60_000 }, () => {
           name: 'download_repository_archive',
           arguments: {
             project_id: TEST_PROJECT_ID,
-            format: 'zip',
+            format: 'tar.gz',
             sha: 'main',
             path: 'src',
             exclude_paths: 'dist,tmp',
@@ -122,17 +133,28 @@ describe('Repository archive download', { timeout: 60_000 }, () => {
     const result = parseSSE(await toolRes.text()).find(item => item.id === 2);
     assert.ok(result?.result, `Tool should return a result: ${result?.error?.message ?? ''}`);
 
-    const textBlock = result.result.content?.find(item => item.type === 'text');
-    assert.ok(textBlock?.text, 'Should have text content');
-    const parsed = JSON.parse(textBlock.text);
-    assert.ok(parsed.download_url.includes('/downloads/repository-archive'));
-    assert.ok(parsed.download_url.includes('_token='), 'URL should contain embedded auth token');
-    assert.strictEqual(parsed.filename, 'repository_archive.zip');
+    const resourceBlock = result.result.content?.find(
+      (item): item is Extract<ToolContent, { type: 'resource' }> => item.type === 'resource'
+    );
+    assert.ok(resourceBlock?.resource, 'Should have embedded resource content');
+    assert.strictEqual(resourceBlock.resource.mimeType, 'application/gzip');
+    assert.ok(resourceBlock.resource.uri.endsWith('/repository_archive.tar.gz?sha=main&path=src'));
+    assert.ok(resourceBlock.resource.blob, 'Embedded resource should contain base64 data');
 
-    const downloadRes = await fetch(parsed.download_url);
-    assert.strictEqual(downloadRes.status, 200, 'Download URL should work without auth headers');
-    const body = Buffer.from(await downloadRes.arrayBuffer());
-    assert.ok(body.includes(Buffer.from('PK')), 'Should contain zip magic bytes');
+    const archive = Buffer.from(resourceBlock.resource.blob, 'base64');
+    assert.deepStrictEqual(archive, FAKE_GZIP, 'MCP resource should contain the GitLab archive bytes');
+    assert.deepStrictEqual(gunzipSync(archive), ARCHIVE_PAYLOAD, 'Returned resource should be valid gzip');
+
+    const textBlock = result.result.content?.find(
+      (item): item is Extract<ToolContent, { type: 'text' }> => item.type === 'text'
+    );
+    assert.ok(textBlock?.text, 'Should also include archive metadata');
+    const metadata = JSON.parse(textBlock.text);
+    assert.strictEqual(metadata.filename, 'repository_archive.tar.gz');
+    assert.strictEqual(metadata.mime_type, 'application/gzip');
+    assert.strictEqual(metadata.size, FAKE_GZIP.byteLength);
+    assert.ok(!('download_url' in metadata), 'Remote result must not require a secondary URL fetch');
+
     assert.strictEqual(repositoryArchiveQuery.sha, 'main');
     assert.strictEqual(repositoryArchiveQuery.path, 'src');
     assert.strictEqual(repositoryArchiveQuery.exclude_paths, 'dist,tmp');

@@ -146,50 +146,6 @@ export function registerDownloadProxy(app: Express, deps: DownloadProxyDependenc
           gitlabUrl = `${apiUrl}/projects/${encodeURIComponent(effectiveProjectId)}/jobs/${deps.encodeGitLabPathSegment(job_id)}/artifacts`;
           break;
         }
-        case "repository-archive": {
-          const {
-            project_id,
-            format = "tar.gz",
-            sha,
-            path,
-            exclude_paths,
-            include_lfs_blobs,
-            ref_type,
-          } = req.query as Record<string, string>;
-          if (!project_id) {
-            res.status(400).json({ error: "project_id is required" });
-            return;
-          }
-          if (
-            !new Set(["bz2", "tar", "tar.bz2", "tar.gz", "tb2", "tbz", "tbz2", "zip"]).has(
-              format
-            )
-          ) {
-            res.status(400).json({ error: `Unsupported repository archive format: ${format}` });
-            return;
-          }
-          if (
-            include_lfs_blobs !== undefined &&
-            include_lfs_blobs !== "true" &&
-            include_lfs_blobs !== "false"
-          ) {
-            res.status(400).json({ error: "include_lfs_blobs must be true or false" });
-            return;
-          }
-          const effectiveProjectId = deps.getEffectiveProjectId(decodeURIComponent(project_id));
-          const archiveUrl = new URL(
-            `${apiUrl}/projects/${encodeURIComponent(effectiveProjectId)}/repository/archive.${format}`
-          );
-          if (sha) archiveUrl.searchParams.set("sha", sha);
-          if (path) archiveUrl.searchParams.set("path", path);
-          if (exclude_paths) archiveUrl.searchParams.set("exclude_paths", exclude_paths);
-          if (include_lfs_blobs !== undefined) {
-            archiveUrl.searchParams.set("include_lfs_blobs", include_lfs_blobs);
-          }
-          if (ref_type) archiveUrl.searchParams.set("ref_type", ref_type);
-          gitlabUrl = archiveUrl.toString();
-          break;
-        }
         case "attachment": {
           const { project_id, secret, filename } = req.query as Record<string, string>;
           if (!project_id || !secret || !filename) {

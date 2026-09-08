@@ -60,7 +60,7 @@ const TOOL_GUIDANCE: Readonly<Record<string, string>> = {
   download_job_artifacts:
     "Use this to retrieve a pipeline job's artifact archive; remote HTTP mode returns a download URL while local mode saves the archive to a local path. It is read-only but may create a local file in stdio mode, requires job/project access, and returns the download result or an artifact/permission error.",
   download_repository_archive:
-    "Use this to retrieve a repository snapshot without cloning; remote HTTP mode returns a download URL while local mode saves the archive to a local path. It is read-only with respect to GitLab but may create a local file in stdio mode, requires repository access, and returns the archive or a repository/ref/permission error.",
+    "Use this to retrieve a repository snapshot without cloning; remote HTTP mode returns the archive bytes directly as an embedded MCP binary resource while local mode saves the archive to a local path. It is read-only with respect to GitLab but may create a local file in stdio mode, requires repository access, and returns the archive or a repository/ref/permission error.",
   download_attachment:
     "Use this to retrieve a previously uploaded project attachment; remote mode returns inline base64 for images or a download URL, while local mode can save to a path. It is read-only with respect to GitLab, requires project access, and returns the file content or an attachment/permission error.",
   execute_graphql:

@@ -819,7 +819,7 @@ export const allTools = [
   {
     name: "download_repository_archive",
     description: IS_REMOTE
-      ? "Get a download URL for a repository archive"
+      ? "Return a repository archive as an embedded MCP binary resource"
       : "Download a repository archive and save it to a local path",
     inputSchema: IS_REMOTE
       ? toJSONSchema(DownloadRepositoryArchiveRemoteSchema)

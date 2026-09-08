@@ -13195,28 +13195,8 @@ async function handleToolCall(params: any) {
       case "download_repository_archive": {
         const { project_id, format, local_path, ...options } =
           DownloadRepositoryArchiveSchema.parse(params.arguments);
-        if (IS_REMOTE) {
-          if (local_path) {
-            throw new Error(
-              "local_path cannot be used in remote mode — use the returned download_url instead"
-            );
-          }
-          const downloadParams: Record<string, string> = { project_id, format };
-          Object.entries(options).forEach(([key, value]) => {
-            if (value !== undefined) downloadParams[key] = String(value);
-          });
-          const downloadUrl = buildDownloadUrl("repository-archive", downloadParams);
-          return {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify({
-                  download_url: downloadUrl,
-                  filename: `repository_archive.${format}`,
-                }),
-              },
-            ],
-          };
+        if (IS_REMOTE && local_path) {
+          throw new Error("local_path cannot be used in remote mode");
         }
 
         const effectiveProjectId = getEffectiveProjectId(decodeURIComponent(project_id));
@@ -13235,10 +13215,49 @@ async function handleToolCall(params: any) {
           throw new Error("Repository archive not found. Check the project, ref, and path.");
         }
         await handleGitLabError(response);
+
+        const filename = `repository_archive.${format}`;
+        if (IS_REMOTE) {
+          const archiveBuffer = Buffer.from(await response.arrayBuffer());
+          const mimeType =
+            format === "tar.gz"
+              ? "application/gzip"
+              : format === "zip"
+                ? "application/zip"
+                : format === "tar"
+                  ? "application/x-tar"
+                  : "application/x-bzip2";
+          const resourceUri = new URL(
+            `gitlab://repository-archive/${encodeURIComponent(effectiveProjectId)}/${filename}`
+          );
+          if (options.sha) resourceUri.searchParams.set("sha", options.sha);
+          if (options.path) resourceUri.searchParams.set("path", options.path);
+
+          return {
+            content: [
+              {
+                type: "resource",
+                resource: {
+                  uri: resourceUri.toString(),
+                  mimeType,
+                  blob: archiveBuffer.toString("base64"),
+                },
+              },
+              {
+                type: "text",
+                text: JSON.stringify({
+                  filename,
+                  mime_type: mimeType,
+                  size: archiveBuffer.byteLength,
+                }),
+              },
+            ],
+          };
+        }
+
         if (!response.body) {
           throw new Error("No response body from GitLab");
         }
-        const filename = `repository_archive.${format}`;
         const { stream: saveStream, path: savePath } = openSafeOutputWriteStream(
           filename,
           local_path,
