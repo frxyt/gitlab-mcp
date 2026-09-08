@@ -13208,8 +13208,14 @@ async function handleToolCall(params: any) {
             archiveUrl.searchParams.set(key, typeof value === "boolean" ? String(value) : value);
           }
         });
+        const archiveFetchConfig = getFetchConfig();
+        const archiveHeaders = new Headers(archiveFetchConfig.headers);
+        // Repository archive endpoints return binary content. The shared fetch
+        // config may advertise JSON, which GitLab rejects with HTTP 406.
+        archiveHeaders.set("Accept", "*/*");
         const response = await fetch(archiveUrl.toString(), {
-          ...getFetchConfig(),
+          ...archiveFetchConfig,
+          headers: archiveHeaders,
         });
         if (response.status === 404) {
           throw new Error("Repository archive not found. Check the project, ref, and path.");

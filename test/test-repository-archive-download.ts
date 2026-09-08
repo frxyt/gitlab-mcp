@@ -38,6 +38,7 @@ describe('Repository archive download', { timeout: 60_000 }, () => {
   let serverPort: number;
   let sessionId: string;
   let repositoryArchiveQuery: Record<string, unknown> = {};
+  let repositoryArchiveAccept: string | undefined;
 
   before(async () => {
     const mockPort = await findMockServerPort();
@@ -50,6 +51,11 @@ describe('Repository archive download', { timeout: 60_000 }, () => {
       `/projects/${TEST_PROJECT_ID}/repository/archive.tar.gz`,
       (req, res) => {
         repositoryArchiveQuery = req.query as Record<string, unknown>;
+        repositoryArchiveAccept = req.headers.accept;
+        if (repositoryArchiveAccept !== '*/*') {
+          res.status(406).json({ message: '406 Not Acceptable' });
+          return;
+        }
         // GitLab may use a generic content type for downloads; the MCP tool must
         // still expose the archive with the MIME type implied by the requested format.
         res.set('Content-Type', 'application/octet-stream');
@@ -103,6 +109,7 @@ describe('Repository archive download', { timeout: 60_000 }, () => {
 
   test('returns the tar.gz directly as an embedded MCP resource', async () => {
     repositoryArchiveQuery = {};
+    repositoryArchiveAccept = undefined;
     const toolRes = await fetch(`http://${HOST}:${serverPort}/mcp`, {
       method: 'POST',
       headers: {
@@ -155,6 +162,7 @@ describe('Repository archive download', { timeout: 60_000 }, () => {
     assert.strictEqual(metadata.size, FAKE_GZIP.byteLength);
     assert.ok(!('download_url' in metadata), 'Remote result must not require a secondary URL fetch');
 
+    assert.strictEqual(repositoryArchiveAccept, '*/*');
     assert.strictEqual(repositoryArchiveQuery.sha, 'main');
     assert.strictEqual(repositoryArchiveQuery.path, 'src');
     assert.strictEqual(repositoryArchiveQuery.exclude_paths, 'dist,tmp');
